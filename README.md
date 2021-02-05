@@ -1,0 +1,2 @@
+# developersmindset
+Develop me 
