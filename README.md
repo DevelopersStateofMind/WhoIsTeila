@@ -39,12 +39,11 @@ Fun Fact: I am the friend that encourges you to step out your comfort zone only 
 
 <br />
 
-📫 How to reach me:
+📫 How to reach me: (305) 389-8291
 <br />
 🖥 Portfolio: 
 <br />
-📩 Email: tgarraway08@yahoo.com
-<br />
+📩 Email: tgarraway08@google.com
 💼 LinkedIn: https://www.linkedin.com/in/teila-garraway-37121154/
 <br />
 
