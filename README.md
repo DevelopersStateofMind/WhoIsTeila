@@ -43,7 +43,7 @@ Fun Fact: I am the friend that encourges you to step out your comfort zone only 
 <br />
 🖥 Portfolio: 
 <br />
-📩 Email: tgarraway08@google.com
+📩 Email: tgarraway08@gmail.com
 💼 LinkedIn: https://www.linkedin.com/in/teila-garraway-37121154/
 <br />
 
