@@ -10,53 +10,55 @@ Related: [`blog-generator-research.md`](blog-generator-research.md), [`blog-seo-
 | # | Decision |
 |---|---|
 | 1 | **Standalone app that serves multiple clients from one install.** Sold to clients. Each client is a separate account with its own site, brand, keywords and settings |
-| 2 | **Test phase = 4 SPC-owned sites only:** SourcePro Consultants, Esquire Pilot, Find George Atty (domain TBC), teilagarraway.com. Luxe World Travels and Tribe of Judah move to the first client wave after testing |
+| 2 | **Test phase = 4 SPC-owned sites only:** sourceproconsultants.com, findgeorgiaattorney.com, teilagarraway.com, esquirepilot.com (not built yet, joins when live). Luxe World Travels and Tribe of Judah move to the first client wave after testing |
 | 3 | **Publishing:** custom sites first, through the app's Content API. WordPress and GHL connectors come later, on demand |
 | 4 | **Business owner approval** on every post, every client, every industry. Industry packs (e.g. the law firm pack) add rules on top |
 | 5 | **Owner Insight step** before drafting (Section 4) |
 | 6 | **CTA library set at onboarding.** Every post gets a CTA (Section 5) |
 | 7 | **Keyword Library lives inside the app.** ClickUp is an optional notification, not where the data lives |
-| 8 | **App stack: Next.js** (app + owner portal + Content API in one codebase). Scheduled jobs run in the app (cron/queue); n8n optional |
+| 8 | **App stack: Next.js + Postgres**, hosted on the **SPC VPS** (Docker + Traefik, same pattern as sourceproconsultants.com and findgeorgiaattorney.com). Scheduled jobs run in the app (cron/queue); n8n optional |
 | 9 | **Bring your own AI keys (BYOK):** each client connects their own text AI and image AI accounts. SPC's keys are used only for the 4 SPC sites (Section 9) |
 | 10 | **Owner notifications: email only** (insight request, approval request, published, errors) |
 
 ---
 
-## 2. Publishing architecture (custom sites)
+## 2. Publishing architecture: Blog Receiver (push model)
 
-### Recommended: headless Content API
-The app stores the posts. Each website pulls them in. No redeploy per post.
+**Revised 9/25/26 after auditing the site repos.** sourceproconsultants.com already has a working receiver: `POST /api/blog-posts` with a bearer token, posts stored in the site's own Postgres, draft/publish, `scheduled_for`, a unique `primary_keyword` constraint (enforced in the database), FAQ + schema rendering, and inline + closing CTA blocks. **Standardize that as the contract every site implements.** The app **pushes** approved posts to each site.
 
-```
-[Blog App]  --(approved + scheduled time)-->  Post status = published
-     |
-     |-- GET /api/v1/{site}/posts            (list, paginated, by category)
-     |-- GET /api/v1/{site}/posts/{slug}     (full post: HTML/MDX, meta, schema JSON-LD, images, CTA)
-     |-- GET /api/v1/{site}/sitemap          (blog sitemap entries)
-     |-- GET /api/v1/{site}/rss
-     |
-     '-- POST webhook -> {site}/api/revalidate   (tells the site to refresh the new page right away)
+Why push instead of the earlier "sites pull from the app" plan:
+- It's already built and running on the main test site
+- Each site owns its posts. If a client cancels, their blog stays live
+- Sites don't go down if the app goes down
 
-[Client site, Next.js]  /blog and /blog/[slug] pages read from the API
-                        page is pre-built and served fast (good Core Web Vitals)
-```
+### SPC Blog Receiver contract v1 (every site implements it)
+| Endpoint | Purpose | SPC site today |
+|---|---|---|
+| `POST /api/blog-posts` | Create post (draft / published / scheduled) | Built |
+| `PATCH /api/blog-posts/{id}` | Edit, unpublish, refresh | Built |
+| `GET /api/blog-posts` | List existing posts (feeds Link Engine + dedupe) | Built |
+| `POST /api/blog-media` | **Upload an image** and get back its public URL | **Missing: images are repo files that need a deploy** |
+| `GET /api/blog-meta` | Categories, authors, CTA keys, limits the site accepts | **Missing** (categories are a hardcoded enum) |
 
-**Per-site install (one time):** add `/blog` routes, a revalidate endpoint, and a read-only API key.
-Package this as a **small SDK** (`@spc/blog-client`) so every future custom site plugs in the same way.
+**Required post fields (v1):** title, slug, category, primary_keyword, secondary_keywords, meta_title (60 max), meta_description (155 max), body (Markdown, answer-first lead), featured_image_url, featured_image_alt, inline images in Markdown with alt text, faq[], status, scheduled_for, author, reviewed_by, cta { mid, end } (site defaults used when omitted), canonical_url.
 
-### Option 2 (not recommended): commit posts to the site's repo
-The app writes an MDX file to each site's GitHub repo, which triggers a redeploy.
-Pros: posts live in the repo. Cons: a rebuild for every post, a GitHub token for every client, slower, and harder to sell to non-developer clients.
+**Auth:** one bearer token per site, stored encrypted in the app. Rotate from the app.
 
 ### Future connectors (same post object, different adapter)
-| Connector | Build when |
-|---|---|
-| WordPress (REST API + application password) | First law firm that won't move off WordPress |
-| GHL Blog API | First client whose site runs on GHL |
-| Webflow / Shopify / Wix | On demand |
-| Embed script (JS widget) | Clients with a site builder that has no API |
+WordPress (REST), GHL Blog API, Webflow/Shopify. Built when a client needs one.
 
 ---
+
+## 2b. Test site audit (9/25/26)
+
+| Site | Repo | Stack | Blog today | Work needed to connect |
+|---|---|---|---|---|
+| **sourceproconsultants.com** | `spc-website` | Next.js 16.2 + Postgres, Docker on SPC VPS | **Full blog + receiver API + admin** | Add `POST /api/blog-media` (images to a persistent volume, no deploy), add `GET /api/blog-meta`, accept `cta` + `author` fields. **Pilot site #1** |
+| **findgeorgiaattorney.com** | `ga-attorney-directory` | **Astro** (not Next.js) + React islands + Postgres, same VPS | **None** | Build blog pages + receiver in Astro (port SPC's contract). Georgia Rule 7.2 attorney-advertising language applies: "not legal advice" disclaimer on every post. Repo docs say the scaffold is behind the business docs, so the blog should come after those gaps are closed |
+| **teilagarraway.com** | `teila-garraway-portfolio` | Next.js 16.3, no database yet | **None** (scaffold only, no page content yet) | Add Postgres + copy SPC's blog module and receiver. Blocked until the site has its brand/pages |
+| **esquirepilot.com** | Not created | TBD (Next.js per plan) | None | Include the blog module from day 1 using the SPC template |
+
+**Build-order recommendation:** SPC site first (receiver exists, has GSC history). Then build the blog module once as a **reusable package** (`spc-blog-module`: DB migration + receiver API + blog pages + CTA components) and drop it into teilagarraway.com and esquirepilot.com. Port it to Astro for findgeorgiaattorney.com.
 
 ## 3. Existing n8n workflows: verdict
 
@@ -76,7 +78,7 @@ Checked live in n8n on 9/25/26.
 Keep its logic. It's the **"GSC opportunity"** signal in the Keyword Engine: queries with 20+ impressions ranking below position 10, plus the Claude relevance filter that drops brand-confusion noise.
 
 W0's limits as the only source:
-1. **GSC only.** Newer sites (e.g. Esquire Pilot, Find George Atty, teilagarraway.com) may have little GSC data yet, so they need DataForSEO research to seed their libraries
+1. **GSC only.** Newer sites (findgeorgiaattorney.com, teilagarraway.com, esquirepilot.com) may have little GSC data yet, so they need DataForSEO research to seed their libraries
 2. **Hardcoded to SPC**: domain, ClickUp list, brand prompt
 3. **Top 3 per week**, with no library, scoring, clusters or dedupe against published posts
 4. **ClickUp is the queue.** Clients won't have your ClickUp
@@ -144,7 +146,48 @@ Keyword picked -> SERP Brief built -> OWNER INSIGHT REQUEST -> (wait) -> Draft -
 | Commercial (cost, comparison, "hire") | Primary CTA | Primary CTA |
 
 - UTM on every CTA so **leads are tracked back to each post** (this feeds the monthly client report)
-- Test phase: Teila provides the primary and secondary CTAs for all 4 SPC sites at onboarding
+- Test phase CTAs (pulled from the repos 9/25/26):
+
+| Site | Primary CTA (found) | Soft CTA |
+|---|---|---|
+| sourceproconsultants.com | "Book Your Free Legal Systems Health Check" (GHL booking widget, `site.bookingUrl`). Commercial posts also get "Get the Diagnostic ($597)" | **Newsletter signup exists** (`NewsletterForm`, `/api/subscribe`). A lead magnet is optional; use the prompt in Section 5b |
+| findgeorgiaattorney.com | Two audiences: attorneys, "Get listed" (`/for-attorneys`, `/submit`); consumers, "Find a [practice area] lawyer in [city]" (category pages) | Needs creating (Section 5b) |
+| teilagarraway.com | None yet (no content) | Needs creating (Section 5b) |
+| esquirepilot.com | Not built | Needs creating (Section 5b) |
+
+---
+
+## 5b. Soft CTA generator prompt
+
+Paste into Claude with the site's `docs/business/` brand + service docs attached. Run it once per site.
+
+```
+You are creating the SOFT CTA (low-commitment lead capture) for a business blog.
+
+INPUTS (attached or pasted below):
+- Business: [name, what it sells, who it serves]
+- Primary CTA (high commitment): [label + URL]
+- Audience's top 3 problems: [list, or "infer from the attached docs"]
+- Brand voice + banned words: [attached]
+- Blog topic clusters: [list]
+
+TASK:
+1. Propose 3 soft CTA offers a reader could take in under 2 minutes, each solving
+   one narrow problem the blog audience has BEFORE they are ready for the primary CTA.
+   Allowed formats: checklist, template, self-assessment/scorecard, short email course,
+   calculator, newsletter with a specific promise.
+2. For each: offer name, format, 1-sentence promise, which clusters it fits,
+   effort to build (low/med/high), and why it leads naturally to the primary CTA.
+3. Recommend ONE. For it, write:
+   - Mid-post callout: headline (max 8 words), 1-2 sentence body, button label (max 5 words)
+   - End-of-post version (same offer, slightly more urgency)
+   - Form fields (max 2: name, email)
+   - Thank-you message + the next step that points to the primary CTA
+   - A 3-email follow-up sequence outline (subject + 1-line purpose each)
+   - The lead magnet's outline (sections/items) so it can be built
+RULES: follow the brand voice, no banned words, no hype, no guarantees, no em dashes.
+If the business is a law firm or legal directory, include "not legal advice" where the offer gives guidance.
+```
 
 ---
 
@@ -270,10 +313,10 @@ Sender: a transactional email service (e.g. Resend or Postmark) on a verified SP
 
 ## 11. Open decisions (for build session)
 
-1. **Exact domains** for Esquire Pilot and Find George Atty. Are all 4 sites Next.js in Teila's codebase (one repo or separate repos)?
-2. **CTAs** for all 4 SPC sites (Teila to provide)
-3. **Image style preset** per site (4 presets)
-4. **Hosting** for the app (Vercel / Hostinger VPS / other) + database (Postgres recommended)
+1. **Soft CTAs**: run the Section 5b prompt for each site (SPC can start with the existing newsletter)
+2. **Image style preset** per site (3 now, esquirepilot.com later)
+3. **Build-order approval**: SPC site first, then the reusable `spc-blog-module`, then teilagarraway.com / esquirepilot.com, then the Astro port for findgeorgiaattorney.com
+4. **App name + subdomain** on the VPS (e.g. `blog.sourceproconsultants.com` or `content.sourceproconsultants.com`)
 5. **Pricing / packaging** for resale (run through spc-quote-builder once the build is scoped)
 
 ---
