@@ -2,6 +2,8 @@
 
 **As of September 2026.** Research only. Build happens in a separate session.
 
+SEO rules, keyword counts, QA scoring and the full module map: see [`blog-seo-rulebook.md`](blog-seo-rulebook.md).
+
 ---
 
 ## 1. Verdict: Is this already done?
@@ -88,7 +90,7 @@ GSC opportunity = keyword already gets impressions but no dedicated page, or ran
 1. **URL slug** (check uniqueness via GHL `check-url-slug-exists` or WP)
 2. **Excerpt** + **category** (map to practice area)
 3. **Image alt text + WebP compression** (featured 1200x630, inline)
-4. **Schema JSON-LD** - `BlogPosting`, `FAQPage`, `Person` (attorney author), `LegalService` / `LocalBusiness`
+4. **Schema JSON-LD** - `BlogPosting`, `FAQPage`, `Person` (attorney author), `LegalService` / `LocalBusiness` (hygiene for rich results; a May 2026 Ahrefs study found no AI-citation boost)
 5. **FAQ block (3-5 Qs)** - feeds AI Overviews / ChatGPT citations
 6. **Answer-first opening paragraph** - 40-60 word direct answer (AEO/GEO)
 7. **Internal links** - 2-4 to related posts + 1 to the matching practice-area page
