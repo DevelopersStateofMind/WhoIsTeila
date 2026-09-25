@@ -91,7 +91,7 @@ Top-10 Google results average about 2,400 words. Pages cited in AI Overviews ave
 | **FAQ section** | 3-5 questions from People Also Ask |
 | **CTA** | 1 mid-post + 1 end-of-post (consult / intake form) |
 | **Author box** | Name, credentials, bio, photo, link to author page |
-| **"Reviewed by"** | Named attorney + review date (law firms) |
+| **"Reviewed by"** | Business owner (or named expert) + review date. All industries |
 | **Last updated date** | Shown on the page, updated on every refresh |
 | **Schema (JSON-LD)** | `BlogPosting` + `Person` (author) + `FAQPage` + `BreadcrumbList`. Helps Google understand the page and earn rich results. A May 2026 Ahrefs study found no AI-citation boost from schema, so it's hygiene, not a ranking lever |
 | **Open Graph** | OG title, description and image for social shares |
@@ -111,7 +111,7 @@ App rules:
 4. **Short paragraphs, lists and tables.** Easy for AI to extract.
 5. **Neutral, factual tone** in answer blocks. Save the sales copy for the CTA.
 6. **Specific facts**: numbers, deadlines, statute citations. AI cites specifics.
-7. **Consistent entity data**: firm name, address and attorney names identical everywhere.
+7. **Consistent entity data**: business name, address and author/owner names identical everywhere.
 8. **Track AI visibility.** DataForSEO AI Optimization endpoints (LLM mentions) run monthly per client.
 
 ---
@@ -204,9 +204,13 @@ Failures produce a **fix ticket** (ClickUp/GHL task), not an automatic change.
 
 ---
 
-## 10. Law firm rules (applied when client type = law firm)
+## 10. Industry compliance packs (optional add-on per client)
 
-- **Attorney review is required** before publishing (ABA Formal Opinion 512, Model Rule 7.1). The reviewer's name and date are stored in the audit log
+**Owner approval is required for every client, every industry** (see `blog-app-product-spec.md`). The packs below add rules on top of it.
+
+### Law firm pack
+
+- **The approving owner must be a licensed attorney** (ABA Formal Opinion 512, Model Rule 7.1). Name and date go in the audit log
 - **Banned claims**: "guarantee", "best", "#1", "expert/specialist" (unless certified), promised outcomes, unverified settlement amounts
 - **Disclaimers**: "Attorney Advertising" and "not legal advice", per the state bar
 - **Jurisdiction-specific**: statute of limitations, comparative fault and damage caps cited to the state statute
@@ -225,9 +229,9 @@ Every draft is scored before it reaches the approval step.
 |---|---|---|
 | **Keyword placement** | 15 | Primary keyword in title, H1, slug, first 100 words, H2, meta, alt text. Secondaries used. Density under 2% (hard fail) |
 | **Intent and depth** | 20 | Format matches the SERP. Covers the subtopics shared by the top 5 pages. Word count within the target range |
-| **Information gain** | 10 | At least 1 element the top 10 don't have: local data, firm insight, attorney quote, checklist, example |
+| **Information gain** | 10 | At least 1 element the top 10 don't have: local data, **Owner Insight** answers, owner quote, checklist, example |
 | **Structure / AEO** | 15 | Answer-first opening. Question H2s. Short paragraphs. FAQ block. Table of contents if needed |
-| **E-E-A-T** | 15 | Author + reviewer. 2+ authoritative citations. Facts verified (hard fail on an unverified statute or deadline) |
+| **E-E-A-T** | 15 | Author + owner approval. 2+ authoritative citations. Facts verified (hard fail on an unverified statute or deadline) |
 | **Links** | 10 | 3-5 internal (pillar + service page required). 2-4 external. No broken links |
 | **Meta and media** | 10 | Title/meta lengths. Slug rules. Images with alt text, WebP, correct sizes. Schema valid. OG tags |
 | **Readability and brand** | 5 | Grade 7-9. Brand voice match. Zero banned claims (hard fail) |
@@ -249,8 +253,9 @@ The score, the failing checks and the fixes are logged against the post in the K
 | **Link Engine** | Per post | Existing-content index | Internal links in the new post, pillar updated with a link back |
 | **Image Engine** | Per post | Brief | Featured + inline images, alt text, WebP |
 | **QA Score** | Per post | Draft package | Score, pass/fail, rewrite loop |
-| **Approval Gate** | Per post | Passing draft | Approved / edits requested (GHL or ClickUp) |
-| **Publisher** | Mon/Wed/Fri | Approved post | Live post (WordPress / GHL), sitemap updated |
+| **Owner Insight** | Per post, before drafting | Brief + 3-5 questions | Owner's stories, opinions, examples (or skipped) |
+| **Approval Gate** | Per post | Passing draft | Owner approves / requests edits in the app portal |
+| **Publisher** | Mon/Wed/Fri | Approved post | Live post via Content API (custom sites) or connector (WordPress / GHL later), sitemap updated |
 | **Distribution** | On publish | Live post | GBP post, 3 social posts, newsletter queue |
 | **Index Check** | Publish + 7 days | Search Console URL inspection | Indexed status, alert if not indexed |
 | **Refresh Engine** | Weekly | Search Console performance | Refresh / rewrite-meta / merge queue |

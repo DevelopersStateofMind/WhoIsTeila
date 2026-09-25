@@ -1,0 +1,185 @@
+# Blog Generator App - Product Spec v2
+
+**As of September 2026.** This spec overrides the earlier docs wherever they conflict.
+Related: [`blog-generator-research.md`](blog-generator-research.md), [`blog-seo-rulebook.md`](blog-seo-rulebook.md).
+
+---
+
+## 1. Locked decisions
+
+| # | Decision |
+|---|---|
+| 1 | **Standalone app that serves multiple clients from one install.** Sold to clients. Each client is a separate account with its own site, brand, keywords and settings |
+| 2 | **Test sites:** SourcePro Consultants, Luxe World Travels, Tribe of Judah (all custom-built in Teila's codebase) |
+| 3 | **Publishing:** custom sites first, through the app's Content API. WordPress and GHL connectors come later, on demand |
+| 4 | **Business owner approval** on every post, every client, every industry. Industry packs (e.g. the law firm pack) add rules on top |
+| 5 | **Owner Insight step** before drafting (Section 4) |
+| 6 | **CTA library set at onboarding.** Every post gets a CTA (Section 5) |
+| 7 | **Keyword Library lives inside the app.** ClickUp is an optional notification, not where the data lives |
+
+---
+
+## 2. Publishing architecture (custom sites)
+
+### Recommended: headless Content API
+The app stores the posts. Each website pulls them in. No redeploy per post.
+
+```
+[Blog App]  --(approved + scheduled time)-->  Post status = published
+     |
+     |-- GET /api/v1/{site}/posts            (list, paginated, by category)
+     |-- GET /api/v1/{site}/posts/{slug}     (full post: HTML/MDX, meta, schema JSON-LD, images, CTA)
+     |-- GET /api/v1/{site}/sitemap          (blog sitemap entries)
+     |-- GET /api/v1/{site}/rss
+     |
+     '-- POST webhook -> {site}/api/revalidate   (tells the site to refresh the new page right away)
+
+[Client site, Next.js]  /blog and /blog/[slug] pages read from the API
+                        page is pre-built and served fast (good Core Web Vitals)
+```
+
+**Per-site install (one time):** add `/blog` routes, a revalidate endpoint, and a read-only API key.
+Package this as a **small SDK** (`@spc/blog-client`) so every future custom site plugs in the same way.
+
+### Option 2 (not recommended): commit posts to the site's repo
+The app writes an MDX file to each site's GitHub repo, which triggers a redeploy.
+Pros: posts live in the repo. Cons: a rebuild for every post, a GitHub token for every client, slower, and harder to sell to non-developer clients.
+
+### Future connectors (same post object, different adapter)
+| Connector | Build when |
+|---|---|
+| WordPress (REST API + application password) | First law firm that won't move off WordPress |
+| GHL Blog API | First client whose site runs on GHL |
+| Webflow / Shopify / Wix | On demand |
+| Embed script (JS widget) | Clients with a site builder that has no API |
+
+---
+
+## 3. Existing n8n workflows: verdict
+
+Checked live in n8n on 9/25/26.
+
+| Workflow | Status | Finding |
+|---|---|---|
+| **W0 - SEO Topic Generator (GSC to Blog Queue)** | Active, **failing since 9/14** | Tested end-to-end 9/12. The last 2 Monday runs (9/14, 9/21) errored: the **"SPC > Google Drive account" credential needs reconnecting** (refresh token expired or was revoked). Breaks at "Google Drive - Download Blog Tracker" |
+| W-KEYWORD - Topic Validation Gate | Inactive | DataForSEO competition check before the ClickUp task set is created. Built, never turned on |
+| W1 - Blog Generator | Active, runs daily | Runs finish in under 1 second, which most likely means no topics are reaching it (W0 is down) |
+| W2 - Backlink Intelligence | Active | Google Alerts RSS feeds, scored by Claude as backlink prospects or blog ideas |
+
+**Security flag:** W0's "Google Chat Notification" node has the Chat webhook `key` and `token` typed directly into the URL. Move them into an n8n credential and rotate the webhook.
+
+### Should W0 keep feeding the blog? Yes, as one input, not the whole feed.
+
+Keep its logic. It's the **"GSC opportunity"** signal in the Keyword Engine: queries with 20+ impressions ranking below position 10, plus the Claude relevance filter that drops brand-confusion noise.
+
+W0's limits as the only source:
+1. **GSC only.** Luxe World Travels and Tribe of Judah are newer sites with little GSC data yet, so they need DataForSEO research to seed their libraries
+2. **Hardcoded to SPC**: domain, ClickUp list, brand prompt
+3. **Top 3 per week**, with no library, scoring, clusters or dedupe against published posts
+4. **ClickUp is the queue.** Clients won't have your ClickUp
+
+### Plan
+| Phase | Action |
+|---|---|
+| **Now** | Reconnect the Drive credential in n8n, then run W0 manually once to confirm. Move the Chat webhook secret into a credential. SPC keeps its content flow while the app is built |
+| **Build** | Move W0's GSC gap logic and W-KEYWORD's DataForSEO check into the app's Keyword Engine, set up per client |
+| **Cutover** | For SPC, the app's library replaces W0 + W1. Keep the ClickUp Article/Carousel tasks as an **optional output** ("post published: create repurpose tasks") |
+
+---
+
+## 4. Owner Insight step (new)
+
+**Yes, the app should pause and ask the owner for input before drafting.** This is the highest-value step in the pipeline. It supplies the first-hand experience (the first "E" in E-E-A-T) and the original material that AI can't invent and that Google's helpful-content checks reward.
+
+### Flow
+```
+Keyword picked -> SERP Brief built -> OWNER INSIGHT REQUEST -> (wait) -> Draft -> QA -> OWNER APPROVAL -> Publish
+```
+
+### What the owner receives (email/SMS link to the app portal)
+- Topic, working title, one-line angle, outline (H2s)
+- **3-5 questions written for this topic by Claude**, drawn from:
+  1. "What's the most common mistake you see people make with [topic]?"
+  2. "Share a real example or story (no client names)."
+  3. "Where do you disagree with the usual advice on this?"
+  4. "Any number from your business? (time saved, typical cost, how often it happens)"
+  5. "What do you tell people first when they ask about this?"
+- **Answer by:** typing, **voice note** (transcribed automatically), or pasting notes
+- Buttons: **Submit** / **Skip this one** / **Change topic**
+
+### Rules
+| Setting | Default (can be changed per client) |
+|---|---|
+| Batch | **Monday: one form covering all 3 posts that week** (one touchpoint, not three) |
+| Wait time | 48 hours |
+| No reply | Draft without insight. The QA "Information gain" score is capped and the post is flagged "no owner input" at approval |
+| Use | Owner answers are quoted or paraphrased in the post, shown as the owner's voice ("In our experience...") |
+| Reuse | Answers are saved to an **Insight Bank** per client and can be reused in related posts in the same cluster |
+
+### Owner touchpoints per week
+1. **Monday:** Insight form (3 topics, ~10 minutes)
+2. **Midweek:** Approval (one click per post, or request edits)
+
+---
+
+## 5. CTA system
+
+**Every post gets a CTA.** A blog post without one brings traffic but no leads. Set it up at onboarding as a **CTA library**, not a single link.
+
+### CTA library (per client, at onboarding)
+| Field | Example (SPC) |
+|---|---|
+| **Primary CTA** (high intent) | "Book a Systems & Tool Stack Diagnostic", linking to the booking page |
+| **Secondary CTA** (low intent) | Lead magnet / checklist download / newsletter |
+| **Service-mapped CTAs** | Cluster "case management" goes to the case management service page |
+| Button text + URL + UTM template | `?utm_source=blog&utm_medium=cta&utm_campaign={slug}` |
+
+### Placement rules (app enforces)
+| Post intent | Mid-post (after ~40% of the post) | End of post |
+|---|---|---|
+| Informational (how-to, FAQ) | Secondary (soft) CTA | Primary CTA |
+| Commercial (cost, comparison, "hire") | Primary CTA | Primary CTA |
+
+- UTM on every CTA so **leads are tracked back to each post** (this feeds the monthly client report)
+- Test clients: SPC, Luxe World Travels and Tribe of Judah each need their primary and secondary CTA defined at onboarding
+
+---
+
+## 6. Client onboarding config (one record per client)
+
+| Group | Fields |
+|---|---|
+| Business | Name, industry, service area, services/offers, audience |
+| Brand | Voice notes, banned words, competitors, brand-fit rules |
+| Site | Domain, publishing method (Content API / WordPress / GHL), revalidate URL, API key |
+| Data | GSC property access, DataForSEO location + language |
+| Owner | Name, bio, credentials, headshot (author box), email/phone for insight + approval requests |
+| CTA library | Section 5 |
+| Cadence | Posts/week (default 3), publish days/time, time zone |
+| Compliance pack | None / Law firm / (future: medical, financial) |
+| Notifications | Email, SMS, Google Chat, ClickUp (optional) |
+
+---
+
+## 7. Updated pipeline
+
+```
+Onboarding -> Keyword Engine (GSC gaps [W0 logic] + DataForSEO research [W-KEYWORD logic] + brand-fit scoring)
+          -> Keyword Library -> Cluster Planner
+          -> SERP Brief -> OWNER INSIGHT (Monday batch, 48h)
+          -> Writer -> Fact-Check -> Link Engine -> Image Engine -> CTA Placement
+          -> QA Score (100 pts) -> OWNER APPROVAL
+          -> Publisher (Content API + revalidate webhook | future connectors)
+          -> Distribution (GBP, social, newsletter, optional ClickUp repurpose tasks)
+          -> Index Check -> Refresh Engine -> Monthly Report (includes CTA leads per post)
+```
+
+---
+
+## 8. Open decisions (for build session)
+
+1. **App tech stack**: same Next.js stack as the client sites (one codebase for the app, portal and API), with n8n kept for scheduled jobs? Or everything in n8n with a thin portal?
+2. **Primary/secondary CTAs** for Luxe World Travels and Tribe of Judah
+3. **Owner notification channel**: email, SMS (GHL), or both
+4. **Image model** and brand style per client
+5. **Pricing / packaging** for resale (run through spc-quote-builder once the build is scoped)

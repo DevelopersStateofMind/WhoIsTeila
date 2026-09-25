@@ -4,6 +4,8 @@
 
 SEO rules, keyword counts, QA scoring and the full module map: see [`blog-seo-rulebook.md`](blog-seo-rulebook.md).
 
+> **Superseded in part by [`blog-app-product-spec.md`](blog-app-product-spec.md):** owner approval (not attorney) for all clients, custom sites via a Content API first (WordPress/GHL later), Owner Insight step, CTA library.
+
 ---
 
 ## 1. Verdict: Is this already done?
